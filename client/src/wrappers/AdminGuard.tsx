@@ -1,13 +1,8 @@
-import { Navigate } from '@umijs/max';
-import type { ReactNode } from 'react';
+import { Navigate, Outlet } from '@umijs/max';
 import { ROUTES } from '@/constants/routes';
 import { useAuthStore } from '@/stores/authStore';
 
-interface AdminGuardProps {
-  children: ReactNode;
-}
-
-export default function AdminGuard({ children }: AdminGuardProps) {
+export default function AdminGuard() {
   const currentUser = useAuthStore((state) => state.currentUser);
 
   if (!currentUser) {
@@ -18,5 +13,5 @@ export default function AdminGuard({ children }: AdminGuardProps) {
     return <Navigate to={ROUTES.studentDevices} replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 }

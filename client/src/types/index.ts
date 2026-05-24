@@ -26,6 +26,8 @@ export interface Device {
   availableQuantity: number;
   status: DeviceStatus;
   description?: string;
+  image?: string;
+  images?: string[];
 }
 
 export interface BorrowRequest {

@@ -12,28 +12,28 @@ export default function AdminReturnsPage() {
 
   const handleReturn = async (id: string) => {
     await markReturned(id);
-    message.success('Da ghi nhan tra thiet bi');
+    message.success('Đã ghi nhận trả thiết bị');
     refresh();
   };
 
   return (
     <>
-      <PageTitle title="Ghi nhan tra thiet bi" description="Cap nhat yeu cau da tra va so luong trong kho." />
+      <PageTitle title="Ghi nhận trả thiết bị" description="Cập nhật yêu cầu đã trả và số lượng trong kho." />
       <Card>
         <Table<BorrowRequest>
           rowKey="id"
           loading={loading}
           dataSource={borrowedRequests}
           columns={[
-            { title: 'Sinh vien', dataIndex: 'studentName' },
-            { title: 'Thiet bi', dataIndex: 'deviceName' },
-            { title: 'Ngay tra du kien', dataIndex: 'returnDate', render: formatDate },
-            { title: 'Trang thai', dataIndex: 'status', render: (status) => <StatusTag status={status} /> },
+            { title: 'Sinh viên', dataIndex: 'studentName' },
+            { title: 'Thiết bị', dataIndex: 'deviceName' },
+            { title: 'Ngày trả dự kiến', dataIndex: 'returnDate', render: formatDate },
+            { title: 'Trạng thái', dataIndex: 'status', render: (status) => <StatusTag status={status} /> },
             {
-              title: 'Thao tac',
+              title: 'Thao tác',
               render: (_, record) => (
                 <Button type="primary" size="small" onClick={() => handleReturn(record.id)}>
-                  Da tra
+                  Đã trả
                 </Button>
               )
             }

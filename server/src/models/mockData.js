@@ -1,13 +1,13 @@
 const users = [
   {
     id: 'u1',
-    fullName: 'Nguyen Van A',
+    fullName: 'Nguyễn Văn A',
     email: 'student@example.com',
     role: 'student'
   },
   {
     id: 'admin1',
-    fullName: 'Quan tri vien',
+    fullName: 'Quản trị viên',
     email: 'admin@example.com',
     role: 'admin'
   }
@@ -16,25 +16,25 @@ const users = [
 const devices = [
   {
     id: 'd1',
-    name: 'May chieu',
-    category: 'Thiet bi trinh chieu',
+    name: 'Máy chiếu',
+    category: 'Thiết bị trình chiếu',
     totalQuantity: 5,
     availableQuantity: 3,
     status: 'available',
-    description: 'Dung cho phong hoc va su kien cau lac bo'
+    description: 'Dùng cho phòng học và sự kiện câu lạc bộ'
   },
   {
     id: 'd2',
-    name: 'Micro khong day',
-    category: 'Am thanh',
+    name: 'Micro không dây',
+    category: 'Âm thanh',
     totalQuantity: 10,
     availableQuantity: 6,
     status: 'available'
   },
   {
     id: 'd3',
-    name: 'Loa keo',
-    category: 'Am thanh',
+    name: 'Loa kéo',
+    category: 'Âm thanh',
     totalQuantity: 2,
     availableQuantity: 1,
     status: 'available'
@@ -45,21 +45,21 @@ const borrowRequests = [
   {
     id: 'br1',
     studentId: 'u1',
-    studentName: 'Nguyen Van A',
+    studentName: 'Nguyễn Văn A',
     deviceId: 'd1',
-    deviceName: 'May chieu',
+    deviceName: 'Máy chiếu',
     quantity: 1,
     borrowDate: '2026-05-12',
     returnDate: '2026-05-15',
     status: 'pending',
-    note: 'Muon cho su kien CLB'
+    note: 'Mượn cho sự kiện CLB'
   },
   {
     id: 'br2',
     studentId: 'u1',
-    studentName: 'Nguyen Van A',
+    studentName: 'Nguyễn Văn A',
     deviceId: 'd2',
-    deviceName: 'Micro khong day',
+    deviceName: 'Micro không dây',
     quantity: 2,
     borrowDate: '2026-05-01',
     returnDate: '2026-05-03',

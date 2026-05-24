@@ -14,9 +14,9 @@ function createBorrowRequest(req, res) {
   const newRequest = {
     id: `br${Date.now()}`,
     studentId: 'u1',
-    studentName: 'Nguyen Van A',
+    studentName: 'Nguyễn Văn A',
     deviceId: req.body.deviceId,
-    deviceName: device?.name || 'Thiet bi dang chon',
+    deviceName: device?.name || 'Thiết bị đang chọn',
     quantity: Number(req.body.quantity || 1),
     borrowDate: req.body.borrowDate,
     returnDate: req.body.returnDate,

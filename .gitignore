@@ -6,3 +6,6 @@ dist/
 .DS_Store
 coverage/
 *.log
+
+# Personal reference files
+docs/design/

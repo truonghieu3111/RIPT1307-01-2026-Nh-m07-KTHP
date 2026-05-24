@@ -1,10 +1,10 @@
 export const BORROW_STATUS_LABEL = {
-  pending: 'Cho duyet',
-  approved: 'Da duyet',
-  rejected: 'Tu choi',
-  borrowed: 'Dang muon',
-  returned: 'Da tra',
-  overdue: 'Qua han'
+  pending: 'Chờ duyệt',
+  approved: 'Đã duyệt',
+  rejected: 'Từ chối',
+  borrowed: 'Đang mượn',
+  returned: 'Đã trả',
+  overdue: 'Quá hạn'
 } as const;
 
 export const BORROW_STATUS_COLOR = {
