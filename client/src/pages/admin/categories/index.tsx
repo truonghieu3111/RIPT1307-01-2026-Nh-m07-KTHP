@@ -143,7 +143,7 @@ export default function AdminCategoriesPage() {
         description="Quản lý nhóm thiết bị dùng trong kho."
         actions={
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal} style={{ background: '#2D4A3E', borderColor: '#2D4A3E' }}>
-          + Thêm danh mục
+          Thêm danh mục
         </Button>
         }
       />
