@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Alert, Button, Card, Col, Progress, Row, Select, Skeleton, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Col, Progress, Row, Select, Skeleton, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   Bar,
   BarChart,
@@ -41,10 +41,17 @@ import {
 import type { DeviceStats, RequestStats, StudentStatsSummary, TimeTrendStat, TopDeviceStat, TopStudentStat } from '@/services/statistics';
 import { getBorrowRequests } from '@/services/borrowRequests';
 import type { NormalizedBorrowRequest } from '@/services/borrowRequests';
+import { exportToExcel } from '@/utils/exportExcel';
 
 const now = new Date();
 const REQUEST_COLORS = ['#2D4A3E', '#C99A3F', '#355D8E', '#9B3E33', '#B05A4D', '#8A8E88', '#6B6F6C'];
 type TrendRow = TimeTrendStat & { label: string };
+interface StatisticsExportRow {
+  group: string;
+  metric: string;
+  value: string | number;
+  note?: string;
+}
 
 type StudentRank = 'diamond' | 'gold' | 'silver' | 'bronze' | 'pebble';
 
@@ -109,6 +116,11 @@ function RankTag({ score, rank }: { score?: number; rank?: string }) {
   }
   const config = RANK_CONFIG[normalizedRank];
   return <Tag style={{ border: 'none', borderRadius: 999, color: config.color, background: config.bg, fontWeight: 700 }}>{config.label}</Tag>;
+}
+
+function getRankLabel(score?: number, rank?: string) {
+  const normalizedRank = typeof score === 'number' ? deriveRankFromTrustScore(score) : normalizeTrustRank(rank);
+  return normalizedRank ? RANK_CONFIG[normalizedRank].label : 'Chưa xác định';
 }
 
 function formatDate(value?: string) {
@@ -873,6 +885,100 @@ export default function AdminStatisticsPage() {
     return { value, label: String(value) };
   });
   const monthOptions = Array.from({ length: 12 }, (_, index) => ({ value: index + 1, label: `Tháng ${index + 1}` }));
+  const statsLoading = deviceLoading || requestLoading || studentLoading || timeLoading || overdueLoading;
+
+  const handleExportStatistics = () => {
+    const hasDataForExport = Boolean(deviceStats || requestStats || studentStats || timeStats?.length || overdueRequests.length);
+    if (!hasDataForExport) {
+      message.warning('Không có dữ liệu để xuất.');
+      return;
+    }
+
+    const rows: StatisticsExportRow[] = [
+      { group: 'Tổng quan', metric: 'Kỳ thống kê', value: periodLabel, note: 'Dữ liệu theo tháng/năm đang chọn khi có áp dụng bộ lọc thời gian.' },
+      { group: 'Tổng quan', metric: 'Năm xu hướng', value: year, note: `Phần theo thời gian chỉ dùng dữ liệu năm ${year}.` }
+    ];
+
+    if (deviceStats) {
+      const usageRate = deviceStats.sumTotal > 0 ? `${Math.round((deviceStats.sumBorrowing / deviceStats.sumTotal) * 100)}%` : '0%';
+      rows.push(
+        { group: 'Theo thiết bị', metric: 'Tổng loại thiết bị', value: deviceStats.totalDeviceTypes, note: 'Toàn hệ thống hiện tại' },
+        { group: 'Theo thiết bị', metric: 'Tổng số lượng thiết bị', value: deviceStats.sumTotal, note: 'Toàn hệ thống hiện tại' },
+        { group: 'Theo thiết bị', metric: 'Đang được mượn', value: deviceStats.sumBorrowing, note: 'Số lượng hiện tại đang sử dụng' },
+        { group: 'Theo thiết bị', metric: 'Tỉ lệ sử dụng', value: usageRate, note: 'Hiện tại: đang mượn / tổng số lượng' },
+        { group: 'Theo thiết bị', metric: 'Hỏng / bảo trì', value: deviceStats.sumUnavailable ?? 'Chưa có dữ liệu', note: 'Tình trạng hiện tại' }
+      );
+      deviceStats.topDevices.forEach((device, index) => {
+        rows.push({
+          group: 'Theo thiết bị',
+          metric: `Top ${index + 1}: ${device.name}`,
+          value: device.totalBorrows,
+          note: `Lượt mượn trong ${periodLabel}${device.code ? ` · ${device.code}` : ''}`
+        });
+      });
+    }
+
+    if (requestStats) {
+      const approvalRate = requestStats.totalRequests > 0 ? `${Math.round((requestStats.approvedCount / requestStats.totalRequests) * 100)}%` : '0%';
+      const rejectedRate = requestStats.totalRequests > 0 ? `${Math.round((requestStats.rejectedCount / requestStats.totalRequests) * 100)}%` : '0%';
+      rows.push(
+        { group: 'Theo yêu cầu', metric: 'Yêu cầu trong tháng', value: requestStats.totalRequests, note: `Phát sinh trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Đã duyệt / Chờ bàn giao', value: requestStats.approvedCount, note: `Trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Chờ duyệt', value: requestStats.pendingCount ?? 0, note: `Trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Đang mượn', value: requestStats.borrowingCount ?? 0, note: `Yêu cầu phát sinh trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Quá hạn theo kỳ', value: requestStats.overdueCount ?? 0, note: `Yêu cầu phát sinh trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Từ chối / huỷ', value: requestStats.rejectedCount, note: `Trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Tỉ lệ duyệt', value: approvalRate, note: `Tính trên yêu cầu trong ${periodLabel}` },
+        { group: 'Theo yêu cầu', metric: 'Tỉ lệ từ chối', value: rejectedRate, note: `Tính trên yêu cầu trong ${periodLabel}` }
+      );
+    }
+    rows.push({ group: 'Theo yêu cầu', metric: 'Quá hạn hiện tại', value: overdueRequests.length, note: 'Đơn quá hạn hiện tại, không lọc theo tháng' });
+
+    if (studentStats) {
+      rows.push(
+        { group: 'Theo sinh viên', metric: 'Tổng sinh viên', value: studentStats.totalStudents, note: 'Toàn hệ thống' },
+        { group: 'Theo sinh viên', metric: 'Đang giữ đồ', value: studentStats.currentlyBorrowing, note: 'Sinh viên đang mượn hoặc quá hạn hiện tại' },
+        { group: 'Theo sinh viên', metric: 'Đã phát sinh yêu cầu', value: studentStats.borrowedStudents ?? 'Chưa có dữ liệu', note: 'Sinh viên từng gửi yêu cầu toàn hệ thống' },
+        { group: 'Theo sinh viên', metric: 'Có lịch sử trễ', value: studentStats.lateStudents ?? 'Chưa có dữ liệu', note: 'Lịch sử trễ hạn toàn hệ thống' }
+      );
+      studentStats.topStudents.forEach((student, index) => {
+        const rate = getOnTimeRate(student);
+        const assessment = getStudentAssessment(student);
+        rows.push({
+          group: 'Theo sinh viên',
+          metric: `${index + 1}. ${student.fullName}`,
+          value: student.totalBorrowRequests ?? getCompletedReturns(student),
+          note: `${student.studentCode} · ${getRankLabel(student.trustScore, student.trustRank)} · ${student.trustScore} điểm · Tỉ lệ đúng hạn: ${rate === undefined ? 'Chưa có đơn hoàn tất' : formatPercent(rate)} · ${assessment.label}`
+        });
+      });
+    }
+
+    [...(timeStats ?? [])]
+      .filter((row) => row.year === year)
+      .sort((a, b) => a.month - b.month)
+      .forEach((row) => {
+        rows.push({
+          group: 'Theo thời gian',
+          metric: `Tháng ${row.month}/${row.year}`,
+          value: row.totalRequests,
+          note: `Tổng yêu cầu trong năm ${year}`
+        });
+      });
+
+    const exported = exportToExcel<StatisticsExportRow>({
+      fileName: `bao-cao-thong-ke-thang-${month}-${year}`,
+      sheetName: 'Báo cáo thống kê',
+      rows,
+      columns: [
+        { header: 'Nhóm', key: 'group', width: 18 },
+        { header: 'Chỉ số', key: 'metric', width: 34 },
+        { header: 'Giá trị', key: 'value', width: 18 },
+        { header: 'Ghi chú', key: 'note', width: 48 }
+      ]
+    });
+
+    if (!exported) message.warning('Không có dữ liệu để xuất.');
+  };
 
   return (
     <div className="admin-statistics-page">
@@ -977,13 +1083,9 @@ export default function AdminStatisticsPage() {
         <div className="admin-statistics-page__actions">
           <Select value={month} onChange={setMonth} style={{ width: 130 }} options={monthOptions} />
           <Select value={year} onChange={setYear} style={{ width: 120 }} options={yearOptions} />
-          <Tooltip title="Chức năng xuất báo cáo sẽ khả dụng khi hệ thống hỗ trợ.">
-            <span title="Chức năng xuất báo cáo sẽ khả dụng khi hệ thống hỗ trợ.">
-              <Button icon={<DownloadOutlined />} disabled>
-                Xuất PDF
-              </Button>
-            </span>
-          </Tooltip>
+          <Button icon={<DownloadOutlined />} loading={statsLoading} onClick={handleExportStatistics}>
+            Xuất Excel
+          </Button>
         </div>
       </header>
 

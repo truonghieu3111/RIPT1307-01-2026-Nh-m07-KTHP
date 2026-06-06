@@ -135,7 +135,7 @@ async function getOverdueRequests(req, res) {
       where: { status: 'overdue' },
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: Student, as: 'student', attributes: ['fullName', 'studentCode', 'phone'] }
+        { model: Student, as: 'student', attributes: ['fullName', 'studentCode', 'phone', 'trustScore', 'trustRank'] }
       ],
       order: [['lateDays', 'DESC']]
     });

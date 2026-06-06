@@ -36,7 +36,7 @@ async function getBorrowRequests({ page = 1, limit = 10, status }) {
     where: whereClause,
     include: [
       { model: Equipment, as: 'equipment' },
-      { model: Student, as: 'student', attributes: ['fullName', 'studentCode', 'className'] }
+      { model: Student, as: 'student', attributes: ['fullName', 'studentCode', 'className', 'trustScore', 'trustRank'] }
     ],
     order: [['created_at', 'DESC']],
     limit: parsedLimit,

@@ -33,6 +33,7 @@ import {
 } from '@/services/students';
 import type { StudentRank, StudentRecord, TrustScoreLogRecord } from '@/services/students';
 import { normalizeUploadUrl } from '@/services/auth';
+import { exportToExcel } from '@/utils/exportExcel';
 
 type StudentStatus = 'active' | 'borrowing' | 'locked' | 'warning';
 type StudentFilter = 'all' | 'borrowing' | 'overdue' | 'locked' | 'attention';
@@ -97,6 +98,18 @@ function normalizeText(value: string) {
 
 function getInitials(name: string) {
   return name.split(/\s+/).map((part) => part[0]).slice(-2).join('').toUpperCase();
+}
+
+function deriveRankFromTrustScore(score: number): StudentRank {
+  if (score >= 90) return 'diamond';
+  if (score >= 80) return 'gold';
+  if (score >= 66) return 'silver';
+  if (score >= 50) return 'bronze';
+  return 'pebble';
+}
+
+function getDisplayRank(student: StudentRecord) {
+  return deriveRankFromTrustScore(student.trustScore);
 }
 
 function getStudentStatus(student: StudentRecord): StudentStatus {
@@ -383,6 +396,26 @@ export default function AdminStudentsPage() {
     ].filter(Boolean) as MenuProps['items'];
   };
 
+  const handleExportStudents = () => {
+    const exported = exportToExcel<StudentRecord>({
+      fileName: 'danh-sach-sinh-vien',
+      sheetName: 'Danh sách sinh viên',
+      rows: filteredStudents,
+      columns: [
+        { header: 'Họ tên', value: (student) => student.fullName, width: 28 },
+        { header: 'MSSV', value: (student) => student.studentCode, width: 16 },
+        { header: 'Email', value: (student) => student.email || 'Chưa có email', width: 30 },
+        { header: 'Lớp', value: (student) => student.className || 'Chưa có lớp', width: 18 },
+        { header: 'Điểm uy tín', value: (student) => student.trustScore, width: 14 },
+        { header: 'Hạng', value: (student) => RANK_CONFIG[getDisplayRank(student)].label, width: 14 },
+        { header: 'Lượt mượn', value: (student) => student.totalBorrowed, width: 14 },
+        { header: 'Trạng thái', value: (student) => STATUS_CONFIG[getStudentStatus(student)].label, width: 18 }
+      ]
+    });
+
+    if (!exported) message.warning('Không có dữ liệu để xuất.');
+  };
+
   return (
     <div className="admin-students-page">
       <style>{`
@@ -514,13 +547,9 @@ export default function AdminStudentsPage() {
           </h1>
           <p className="admin-students-page__subtitle">{stats.totalStudents} sinh viên · Phân bố theo hạng uy tín</p>
         </div>
-        <Tooltip title="Chức năng này sẽ khả dụng khi hệ thống hỗ trợ.">
-          <span>
-            <Button icon={<DownloadOutlined />} disabled title="Chức năng này sẽ khả dụng khi hệ thống hỗ trợ.">
-              Xuất Excel
-            </Button>
-          </span>
-        </Tooltip>
+        <Button icon={<DownloadOutlined />} onClick={handleExportStudents}>
+          Xuất Excel
+        </Button>
       </div>
 
       <div className="admin-students-page__rank-grid">

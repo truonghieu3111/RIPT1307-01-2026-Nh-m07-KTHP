@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import {
   Badge,
   Button,
@@ -26,6 +26,7 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { getCategories } from '@/services/categories';
 import { createDevice, deleteDevice, getDevices, toggleDeviceStatus, updateDevice, updateDeviceStock } from '@/services/equipment';
 import type { Device } from '@/types';
+import { exportToExcel } from '@/utils/exportExcel';
 
 type DeviceTier = 'S' | 'A' | 'B' | 'C';
 type DeviceFilter = 'all' | DeviceTier | 'broken' | 'inactive';
@@ -511,6 +512,27 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const handleExportDevices = () => {
+    const exported = exportToExcel<AdminDevice>({
+      fileName: 'danh-sach-thiet-bi',
+      sheetName: 'Danh sách thiết bị',
+      rows: filteredDevices,
+      columns: [
+        { header: 'Mã thiết bị', value: (device) => device.code, width: 18 },
+        { header: 'Tên thiết bị', value: (device) => device.name, width: 30 },
+        { header: 'Danh mục', value: (device) => device.category, width: 24 },
+        { header: 'Hạng thiết bị', value: (device) => device.tier, width: 14 },
+        { header: 'Tổng số lượng', value: (device) => device.totalQuantity, width: 15 },
+        { header: 'Đang sẵn có', value: (device) => device.availableQuantity, width: 15 },
+        { header: 'Đang cho mượn', value: (device) => getBorrowingQuantity(device), width: 16 },
+        { header: 'Hỏng/bảo trì', value: (device) => getBrokenQuantity(device), width: 15 },
+        { header: 'Trạng thái', value: (device) => (device.active ? 'Đang hoạt động' : 'Đã dừng hoạt động'), width: 20 }
+      ]
+    });
+
+    if (!exported) message.warning('Không có dữ liệu để xuất.');
+  };
+
   return (
     <div style={{ paddingBottom: 48 }}>
       <style>
@@ -543,6 +565,9 @@ export default function AdminDevicesPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Button icon={<DownloadOutlined />} onClick={handleExportDevices}>
+            Xuất Excel
+          </Button>
           <Tooltip title="Chức năng nhập danh sách sẽ khả dụng khi hệ thống hỗ trợ.">
             <span>
               <Button disabled title="Chức năng nhập danh sách sẽ khả dụng khi hệ thống hỗ trợ.">

@@ -21,6 +21,7 @@ import {
   Tooltip,
   Typography
 } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { history } from 'umi';
@@ -30,6 +31,7 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { BORROW_STATUS_COLOR } from '@/constants/borrowStatus';
 import { ROUTES } from '@/constants/routes';
 import type { BorrowRequest } from '@/types';
+import { exportToExcel } from '@/utils/exportExcel';
 type RequestStatus = BorrowRequest['status'];
 type RequestTab = 'all' | 'pending' | 'approved' | 'borrowing' | 'overdue' | 'returned' | 'closed';
 type AdminActionType = 'approve' | 'reject' | 'handover' | 'return';
@@ -151,8 +153,15 @@ function normalizeTrustRank(rank?: string): StudentRank | undefined {
   if (['pebble', 'stone', 'rock', 'đá cuội', 'da cuoi', 'da_cuoi'].includes(normalized)) return 'pebble';
   return undefined;
 }
+function getNormalizedRank(score?: number, rank?: string) {
+  return typeof score === 'number' ? deriveRankFromTrustScore(score) : normalizeTrustRank(rank);
+}
+function getRankLabel(score?: number, rank?: string) {
+  const normalizedRank = getNormalizedRank(score, rank);
+  return normalizedRank ? RANK_CONFIG[normalizedRank].label : 'Chưa xác định';
+}
 function RankTag({ score, rank }: { score?: number; rank?: string }) {
-  const normalizedRank = typeof score === 'number' ? deriveRankFromTrustScore(score) : normalizeTrustRank(rank);
+  const normalizedRank = getNormalizedRank(score, rank);
   if (!normalizedRank) return <Typography.Text type="secondary">—</Typography.Text>;
   const config = RANK_CONFIG[normalizedRank];
   return (
@@ -193,6 +202,9 @@ function ellipsisText(value = '', max = 50) {
 }
 function getPurpose(request: AdminRequest) {
   return request.purpose?.trim() || request.note?.trim() || 'Chưa cập nhật';
+}
+function getStatusLabel(status: RequestStatus) {
+  return STATUS_TONE[status]?.label ?? status;
 }
 function statusMatchesTab(status: RequestStatus, tab: RequestTab) {
   if (tab === 'all') return true;
@@ -661,6 +673,27 @@ export default function AdminRequestsPage() {
     { key: 'returned', label: `Đã trả / Đã hoàn tất (${counts.returned})` },
     ...(counts.closed > 0 || activeTab === 'closed' ? [{ key: 'closed', label: `Đã huỷ / Từ chối (${counts.closed})` }] : [])
   ];
+  const handleExportRequests = () => {
+    const exported = exportToExcel<AdminRequest>({
+      fileName: 'danh-sach-yeu-cau',
+      sheetName: 'Danh sách yêu cầu',
+      rows: filteredRequests,
+      columns: [
+        { header: 'Mã đơn', value: (request) => getRequestCode(request), width: 18 },
+        { header: 'Sinh viên', value: (request) => request.studentName, width: 28 },
+        { header: 'MSSV', value: (request) => request.studentCode, width: 16 },
+        { header: 'Hạng', value: (request) => getRankLabel(request.trustScore, request.trustRank), width: 14 },
+        { header: 'Thiết bị', value: (request) => request.deviceName, width: 28 },
+        { header: 'Số lượng', value: (request) => request.quantity, width: 12 },
+        { header: 'Ngày mượn', value: (request) => formatDate(request.borrowDate, 'DD/MM/YYYY'), width: 16 },
+        { header: 'Ngày trả dự kiến', value: (request) => formatDate(request.returnDate, 'DD/MM/YYYY'), width: 18 },
+        { header: 'Mục đích', value: (request) => getPurpose(request), width: 36 },
+        { header: 'Trạng thái', value: (request) => getStatusLabel(request.status), width: 24 }
+      ]
+    });
+
+    if (!exported) message.warning('Không có dữ liệu để xuất.');
+  };
   return (
     <div className="admin-requests-page">
       <style>
@@ -745,11 +778,9 @@ export default function AdminRequestsPage() {
         </div>
         <div className="admin-requests-page__actions">
           <Button onClick={() => setFilterModalOpen(true)}>Lọc nâng cao</Button>
-          <Tooltip title="Chức năng xuất danh sách sẽ khả dụng khi hệ thống hỗ trợ.">
-            <span title="Chức năng xuất danh sách sẽ khả dụng khi hệ thống hỗ trợ.">
-              <Button disabled>Xuất Excel</Button>
-            </span>
-          </Tooltip>
+          <Button icon={<DownloadOutlined />} onClick={handleExportRequests}>
+            Xuất Excel
+          </Button>
         </div>
       </header>
 

@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Button, Col, Empty, Form, Input, Modal, Row, Select, Space, Table, Typography, message } from 'antd';
-import { CheckCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ClockCircleOutlined, DownloadOutlined, WarningOutlined } from '@ant-design/icons';
 import StatusTag from '@/components/StatusTag';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { getReturnableBorrowRequests, markReturned } from '@/services/borrowRequests';
 import type { NormalizedBorrowRequest } from '@/services/borrowRequests';
+import { BORROW_STATUS_LABEL } from '@/constants/borrowStatus';
 import { formatDate } from '@/utils/format';
 import AdminEmptyState from '@/components/admin/AdminEmptyState';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminStatCard from '@/components/admin/AdminStatCard';
 import AdminTableCard from '@/components/admin/AdminTableCard';
+import { exportToExcel } from '@/utils/exportExcel';
 
 interface ReturnFormValues {
   condition: string;
@@ -95,6 +97,25 @@ export default function AdminReturnsPage() {
     }
   };
 
+  const handleExportReturns = () => {
+    const exported = exportToExcel<NormalizedBorrowRequest>({
+      fileName: 'danh-sach-ghi-nhan-tra',
+      sheetName: 'Đơn cần ghi nhận trả',
+      rows: filteredRequests,
+      columns: [
+        { header: 'Mã đơn', value: (request) => request.requestCode, width: 18 },
+        { header: 'Sinh viên', value: (request) => request.studentName || `Sinh viên #${request.studentId}`, width: 28 },
+        { header: 'MSSV', value: (request) => request.studentCode || 'Chưa có MSSV', width: 16 },
+        { header: 'Thiết bị', value: (request) => request.deviceName || `Thiết bị #${request.deviceId}`, width: 28 },
+        { header: 'Ngày mượn', value: (request) => renderDate(request.borrowDate), width: 16 },
+        { header: 'Ngày trả dự kiến', value: (request) => renderDate(request.returnDate), width: 18 },
+        { header: 'Trạng thái', value: (request) => BORROW_STATUS_LABEL[request.status] ?? request.status, width: 16 }
+      ]
+    });
+
+    if (!exported) message.warning('Không có dữ liệu để xuất.');
+  };
+
   return (
     <div style={{ paddingBottom: 48 }}>
       <AdminPageHeader title="Ghi nhận trả thiết bị" description="Cập nhật các đơn đang mượn hoặc đã quá hạn." />
@@ -113,13 +134,18 @@ export default function AdminReturnsPage() {
 
       <AdminTableCard
         extra={
-          <Input.Search
-            allowClear
-            placeholder="Tìm mã đơn, sinh viên, thiết bị..."
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            style={{ width: 320, maxWidth: '100%' }}
-          />
+          <Space wrap>
+            <Button icon={<DownloadOutlined />} onClick={handleExportReturns}>
+              Xuất Excel
+            </Button>
+            <Input.Search
+              allowClear
+              placeholder="Tìm mã đơn, sinh viên, thiết bị..."
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              style={{ width: 320, maxWidth: '100%' }}
+            />
+          </Space>
         }
       >
         <Table<NormalizedBorrowRequest>
