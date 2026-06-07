@@ -68,7 +68,11 @@ async function approveBorrowRequest(req, res) {
 async function rejectBorrowRequest(req, res) {
   try {
     const adminId = req.user.id;
-    const { reason } = req.body;
+    const reason = String(req.body?.reason ?? req.body?.rejectionReason ?? req.body?.rejectReason ?? '').trim();
+    if (!reason) {
+      return res.status(400).json({ message: 'Vui lòng nhập lý do từ chối.' });
+    }
+
     const request = await borrowRequestService.rejectRequest(req.params.id, adminId, reason);
     res.json({ message: 'Đã từ chối đơn', request });
   } catch (error) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Alert,
@@ -51,6 +51,7 @@ interface AdminRequest extends Omit<BorrowRequest, 'id' | 'status'> {
   returnNote?: string;
 }
 interface RejectFormValues {
+  reasonTemplate?: string;
   reason: string;
   note?: string;
 }
@@ -127,6 +128,15 @@ function getRequestCode(request: AdminRequest) {
   const id = String(request.id ?? '');
   const fallbackId = typeof request.id === 'number' ? id.padStart(4, '0') : id;
   return `#REQ-${fallbackId}`;
+}
+function normalizeRequestLookup(value?: string | number | null) {
+  return String(value ?? '').replace(/^#/, '').trim().toLowerCase();
+}
+function requestMatchesQueryId(request: AdminRequest, requestId: string) {
+  const queryValue = normalizeRequestLookup(requestId);
+  const requestCode = normalizeRequestLookup(request.requestCode ?? request.request_code);
+
+  return normalizeRequestLookup(request.id) === queryValue || Boolean(requestCode && requestCode === queryValue);
 }
 function getInitials(name: string) {
   return name
@@ -391,6 +401,7 @@ export default function AdminRequestsPage() {
   const [rankFilter, setRankFilter] = useState<StudentRank | 'all'>('all');
   const [selectedId, setSelectedId] = useState<AdminRequest['id']>();
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const warnedRequestIdRef = useRef<string>();
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [actionKey, setActionKey] = useState<string>();
   const [rejectTarget, setRejectTarget] = useState<AdminRequest>();
@@ -423,6 +434,30 @@ export default function AdminRequestsPage() {
     const unlisten = history.listen(syncQueryState);
     return unlisten;
   }, []);
+
+  useEffect(() => {
+    if (!highlightedRequestId) {
+      warnedRequestIdRef.current = undefined;
+      return;
+    }
+
+    if (loading || !data) return;
+
+    const currentRequests = requests.length ? requests : data.map(toAdminRequest);
+    const matchedRequest = currentRequests.find((request) => requestMatchesQueryId(request, highlightedRequestId));
+    if (matchedRequest) {
+      setSelectedId(matchedRequest.id);
+      setDetailModalOpen(true);
+      warnedRequestIdRef.current = undefined;
+      return;
+    }
+
+    if (warnedRequestIdRef.current !== highlightedRequestId) {
+      message.warning('Không tìm thấy yêu cầu cần xem chi tiết trong danh sách hiện tại.', 3);
+      warnedRequestIdRef.current = highlightedRequestId;
+    }
+  }, [data, highlightedRequestId, loading, requests]);
+
   const keyword = useMemo(() => normalizeText(searchText.trim()), [searchText]);
   const baseFilteredRequests = useMemo(
     () => requests.filter((request) => requestMatchesFilters(request, keyword, dateRange, returnDateRange, rankFilter)),
@@ -504,8 +539,13 @@ export default function AdminRequestsPage() {
   const handleReject = async (values: RejectFormValues) => {
     if (!rejectTarget) return;
 
-    const reasonLabel = REJECT_REASONS.find((item) => item.value === values.reason)?.label ?? values.reason;
-    const finalReason = values.note?.trim() ? `${reasonLabel}. ${values.note.trim()}` : reasonLabel;
+    const reason = String(values.reason ?? '').trim();
+    if (!reason) {
+      message.error('Vui lòng nhập lý do từ chối.', 3);
+      return;
+    }
+
+    const finalReason = values.note?.trim() ? `${reason}. ${values.note.trim()}` : reason;
     const success = await runAction('reject', rejectTarget, () => rejectBorrowRequest(String(rejectTarget.id), finalReason), 'Đã từ chối đơn');
     if (success) {
       setRejectTarget(undefined);
@@ -1040,28 +1080,31 @@ export default function AdminRequestsPage() {
           style={{ marginBottom: 16, borderRadius: 12 }}
         />
         <Form<RejectFormValues> form={rejectForm} layout="vertical" onFinish={handleReject}>
-          <Form.Item name="reason" label="Lý do từ chối" rules={[{ required: true, message: 'Chọn lý do từ chối' }]}>
+          <Form.Item name="reasonTemplate" label="Lý do gợi ý">
             <Select
-              placeholder="Chọn lý do"
+              allowClear
+              placeholder="Chọn nhanh lý do nếu phù hợp"
               options={REJECT_REASONS.map((reason) => ({ value: reason.value, label: reason.label }))}
+              onChange={(value) => {
+                const label = REJECT_REASONS.find((reason) => reason.value === value)?.label;
+                if (label) rejectForm.setFieldValue('reason', label);
+              }}
             />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label="Lý do từ chối"
+            rules={[
+              { required: true, whitespace: true, message: 'Vui lòng nhập lý do từ chối.' }
+            ]}
+          >
+            <Input.TextArea rows={4} placeholder="Nhập lý do cụ thể để sinh viên hiểu vì sao yêu cầu bị từ chối..." />
           </Form.Item>
           <Form.Item
             name="note"
             label="Ghi chú thêm"
-            dependencies={['reason']}
-            rules={[
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (getFieldValue('reason') !== 'other' || String(value ?? '').trim()) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('Nhập ghi chú khi chọn lý do Khác'));
-                }
-              })
-            ]}
           >
-            <Input.TextArea rows={3} placeholder="Giải thích chi tiết để sinh viên hiểu..." />
+            <Input.TextArea rows={3} placeholder="Bổ sung ngữ cảnh xử lý nếu cần..." />
           </Form.Item>
         </Form>
       </Modal>

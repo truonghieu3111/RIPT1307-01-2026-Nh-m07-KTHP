@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet } from 'umi';
 import { ROUTES } from '@/constants/routes';
-import { getMe } from '@/services/auth';
+import { getMe, isDemoAuthUser } from '@/services/auth';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function StudentGuard() {
@@ -11,6 +11,7 @@ export default function StudentGuard() {
 
   useEffect(() => {
     if (!currentUser?.token) return;
+    if (isDemoAuthUser(currentUser)) return;
 
     let mounted = true;
 

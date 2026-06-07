@@ -1,7 +1,7 @@
 import { Button, Checkbox, Col, Form, Input, message, Row, Typography } from 'antd';
 import { history, Link } from 'umi';
 import { ROUTES } from '@/constants/routes';
-import { getMe, login } from '@/services/auth';
+import { getMe, isDemoAuthUser, isDemoLoginEnabled, loginWithDemoFallback } from '@/services/auth';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types';
 
@@ -23,11 +23,16 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function LoginPage() {
   const [form] = Form.useForm<LoginFormValues>();
   const signIn = useAuthStore((state) => state.signIn);
+  const showDemoHint = isDemoLoginEnabled();
 
   const handleSubmit = async (values: LoginFormValues) => {
     try {
-      const user = await login(values);
+      const user = await loginWithDemoFallback(values);
       signIn(user);
+      if (isDemoAuthUser(user)) {
+        history.push(user.role === 'admin' ? ROUTES.adminDashboard : ROUTES.studentDevices);
+        return;
+      }
       const latestUser = await getMe();
       const syncedUser = { ...latestUser, token: user.token };
       signIn(syncedUser);
@@ -74,28 +79,10 @@ export default function LoginPage() {
               minHeight: 'calc(100vh - 56px)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               padding: '72px 64px'
             }}
           >
-            <div
-              style={{
-                width: 74,
-                height: 74,
-                borderRadius: 18,
-                border: '1px solid rgba(245, 235, 208, 0.35)',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#F5EBD0',
-                fontFamily: 'var(--app-heading-font)',
-                fontSize: 34,
-                fontStyle: 'italic',
-                fontWeight: 700
-              }}
-            >
-              B
-            </div>
-
             <div style={{ maxWidth: 560 }}>
               <Typography.Title
                 level={1}
@@ -121,10 +108,6 @@ export default function LoginPage() {
                 mượn trả lành mạnh.
               </Typography.Paragraph>
             </div>
-
-            <Typography.Text style={{ color: 'rgba(255,255,255,0.42)', fontSize: 18 }}>
-              CLB · BorrowIt v1.0 · 2026
-            </Typography.Text>
           </div>
         </Col>
 
@@ -224,6 +207,11 @@ export default function LoginPage() {
                 Đăng ký ngay
               </Link>
             </Typography.Text>
+            {showDemoHint ? (
+              <Typography.Paragraph style={{ textAlign: 'center', color: '#8A8E88', fontSize: 13, margin: '18px auto 0', maxWidth: 500, lineHeight: 1.55 }}>
+                Bản demo frontend: Admin dùng admin@school.edu.vn / password. Sinh viên dùng phanhaiduc1262006@gmail.com / 120606 hoặc pdd150999@gmail.com / 654321.
+              </Typography.Paragraph>
+            ) : null}
           </div>
         </Col>
       </Row>

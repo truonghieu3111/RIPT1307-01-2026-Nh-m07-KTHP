@@ -79,12 +79,21 @@ function getDaysUntil(dateValue?: string) {
 }
 
 function getOverdueDays(dateValue?: string) {
-  const daysUntil = getDaysUntil(dateValue);
-  return daysUntil === undefined ? undefined : Math.max(0, -daysUntil);
+  const date = dayjs(dateValue);
+  if (!date.isValid()) return undefined;
+  return Math.max(dayjs().startOf('day').diff(date.startOf('day'), 'day'), 0);
 }
 
 function getRequestTime(request: NormalizedBorrowRequest) {
   return request.updatedAt || request.createdAt || request.returnDate || request.borrowDate;
+}
+
+function getActivityTimeLabel(request: NormalizedBorrowRequest) {
+  if (request.status === 'overdue' || request.status === 'borrowing') {
+    return `Hạn trả: ${formatDateTime(request.returnDate)}`;
+  }
+
+  return `Cập nhật: ${formatDateTime(getRequestTime(request))}`;
 }
 
 function getActivityPriority(request: NormalizedBorrowRequest) {
@@ -115,8 +124,8 @@ function getRequestStatusQuery(request: NormalizedBorrowRequest) {
   if (request.status === 'approved') return 'approved';
   if (request.status === 'borrowed' || request.status === 'borrowing') return 'borrowing';
   if (request.status === 'overdue') return 'overdue';
-  if (request.status === 'returned' || request.status === 'returned_ontime' || request.status === 'returned_late') return undefined;
-  if (request.status === 'cancelled' || request.status === 'canceled' || request.status === 'cancelled_noshow' || request.status === 'rejected') return undefined;
+  if (request.status === 'returned' || request.status === 'returned_ontime' || request.status === 'returned_late') return 'returned';
+  if (request.status === 'cancelled' || request.status === 'canceled' || request.status === 'cancelled_noshow' || request.status === 'rejected') return 'cancelled';
   return undefined;
 }
 
@@ -185,7 +194,7 @@ function getActivityConfig(request: NormalizedBorrowRequest) {
       tone: 'warning',
       icon: <ClockCircleOutlined />,
       title: `${request.studentName} đang mượn thiết bị`,
-      description: `${request.requestCode} · Hạn trả ${request.returnDate ? dayjs(request.returnDate).format('DD/MM/YYYY') : 'chưa có dữ liệu'}`,
+      description: `${request.requestCode} · ${request.deviceName}`,
       action: 'Chi tiết'
     };
   }
@@ -282,6 +291,7 @@ export default function AdminAlertsPage() {
     [dueSoonRequests, overdueRequests, pendingRequests, recentRequests]
   );
   const overdueTarget = severeOverdueRequests[0] ?? overdueRequests[0];
+  const pendingTarget = pendingRequests[0];
 
   const openTemplateModal = (template: EmailTemplateRecord) => {
     setEditingTemplate(template);
@@ -630,7 +640,7 @@ export default function AdminAlertsPage() {
               <div className="admin-alerts-page__alert-meta">
                 {pendingCount > 0 ? 'Đơn mượn đang chờ quản trị viên xử lý' : 'Không có yêu cầu đang chờ duyệt'}
               </div>
-              <Button type="primary" style={{ marginTop: 12, background: '#2D4A3E' }} onClick={() => history.push(buildRequestsUrl('pending'))}>
+              <Button type="primary" style={{ marginTop: 12, background: '#2D4A3E' }} onClick={() => history.push(pendingTarget ? buildRequestActionUrl(pendingTarget) : buildRequestsUrl('pending'))}>
                 Xử lý ngay
               </Button>
             </div>
@@ -654,7 +664,7 @@ export default function AdminAlertsPage() {
                 <div>
                   <div className="admin-alerts-page__activity-title">{activity.title}</div>
                   <div className="admin-alerts-page__activity-text">{activity.description}</div>
-                  <div className="admin-alerts-page__activity-time">{formatDateTime(getRequestTime(request))}</div>
+                  <div className="admin-alerts-page__activity-time">{getActivityTimeLabel(request)}</div>
                 </div>
                 <Button onClick={() => history.push(buildRequestActionUrl(request))}>{activity.action}</Button>
               </div>

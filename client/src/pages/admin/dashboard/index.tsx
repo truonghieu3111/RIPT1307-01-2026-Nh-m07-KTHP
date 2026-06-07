@@ -8,7 +8,7 @@ import {
   PlusOutlined,
   WarningOutlined
 } from '@ant-design/icons';
-import { Button, Card, Col, Empty, Form, Input, message, Modal, Progress, Row, Select, Skeleton, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Button, Card, Col, Empty, Form, Input, message, Modal, Progress, Row, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { history } from 'umi';
 import { BORROW_STATUS_COLOR, BORROW_STATUS_LABEL } from '@/constants/borrowStatus';
@@ -23,11 +23,24 @@ import {
 import type { NormalizedBorrowRequest } from '@/services/borrowRequests';
 import { getDeviceStats, getRequestStats, getTimeTrendStats } from '@/services/statistics';
 import type { TimeTrendStat } from '@/services/statistics';
+import { exportToExcel } from '@/utils/exportExcel';
 
 type RejectFormValues = {
   reason: string;
   note?: string;
 };
+
+interface DashboardExportRow {
+  group: string;
+  item: string;
+  value: string | number;
+  student?: string;
+  device?: string;
+  time?: string;
+  rank?: string;
+  status?: string;
+  note?: string;
+}
 
 type StudentRank = 'diamond' | 'gold' | 'silver' | 'bronze' | 'pebble';
 
@@ -113,6 +126,16 @@ function RankTag({ score, rank }: { score?: number; rank?: string }) {
       {typeof score === 'number' ? `${config.label} · ${score}` : config.label}
     </Tag>
   );
+}
+
+function getRankLabel(score?: number, rank?: string) {
+  const normalizedRank = typeof score === 'number' ? deriveRankFromTrustScore(score) : normalizeTrustRank(rank);
+  return normalizedRank ? RANK_CONFIG[normalizedRank].label : 'Chưa xác định';
+}
+
+function getStatusLabel(status: string) {
+  const key = status as keyof typeof BORROW_STATUS_LABEL;
+  return BORROW_STATUS_LABEL[key] ?? 'Chưa xác định';
 }
 
 function StatusTag({ status }: { status: string }) {
@@ -376,6 +399,7 @@ export default function AdminDashboardPage() {
     overdue: countsFromRequests.overdue
   };
   const statsLoading = deviceLoading || requestStatsLoading || statusCountsLoading || allRequestsLoading;
+  const reportLoading = statsLoading || trendLoading || pendingLoading;
   const isActionLoading = Boolean(actionKey);
 
   const refreshDashboardRequests = async () => {
@@ -431,6 +455,118 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleExportDashboard = () => {
+    const hasReportData = Boolean(deviceStats || requestStats || statusCounts || timeTrend.length || allRequests.length || pendingRequests.length);
+    if (!hasReportData) {
+      message.warning('Chưa có dữ liệu để xuất báo cáo.');
+      return;
+    }
+
+    const exportedAt = dayjs();
+    const rows: DashboardExportRow[] = [
+      {
+        group: 'Thông tin chung',
+        item: 'Thời điểm xuất báo cáo',
+        value: exportedAt.format('DD/MM/YYYY HH:mm'),
+        note: 'Dữ liệu lấy từ dashboard hiện tại'
+      },
+      {
+        group: 'Thông tin chung',
+        item: 'Tháng/năm đang hiển thị',
+        value: `Tháng ${now.month() + 1}/${now.year()}`,
+        note: `Cập nhật lúc ${now.format('HH:mm')}`
+      },
+      {
+        group: 'Chỉ số tổng quan',
+        item: 'Yêu cầu chờ duyệt',
+        value: pendingCount,
+        status: 'Chờ duyệt'
+      },
+      {
+        group: 'Chỉ số tổng quan',
+        item: 'Đang cho mượn',
+        value: borrowingCount,
+        status: 'Đang mượn'
+      },
+      {
+        group: 'Chỉ số tổng quan',
+        item: 'Đang quá hạn',
+        value: overdueCount,
+        status: 'Quá hạn'
+      },
+      {
+        group: 'Chỉ số tổng quan',
+        item: 'Tỉ lệ sử dụng kho',
+        value: utilization === undefined ? 'Chưa có dữ liệu' : `${utilization}%`,
+        note: `${(deviceStats?.sumBorrowing ?? 0).toLocaleString('vi-VN')} / ${(deviceStats?.sumTotal ?? 0).toLocaleString('vi-VN')} thiết bị`
+      }
+    ];
+
+    if (timeTrend.length > 0) {
+      buildTrendSeries(timeTrend).forEach((trend) => {
+        rows.push({
+          group: 'Xu hướng lượt mượn 12 tháng',
+          item: trend.fullLabel,
+          value: trend.value,
+          note: 'Tổng yêu cầu trong tháng'
+        });
+      });
+    } else {
+      rows.push({ group: 'Xu hướng lượt mượn 12 tháng', item: 'Chưa có dữ liệu', value: 'Chưa có dữ liệu' });
+    }
+
+    const distributionTotal = DONUT_SEGMENTS.reduce((sum, segment) => sum + distributionCounts[segment.key], 0);
+    if (distributionTotal > 0) {
+      DONUT_SEGMENTS.forEach((segment) => {
+        rows.push({
+          group: 'Phân bố trạng thái yêu cầu',
+          item: segment.label,
+          value: distributionCounts[segment.key],
+          note: `${Math.round((distributionCounts[segment.key] / distributionTotal) * 100)}% tổng yêu cầu`
+        });
+      });
+    } else {
+      rows.push({ group: 'Phân bố trạng thái yêu cầu', item: 'Chưa có dữ liệu', value: 'Chưa có dữ liệu' });
+    }
+
+    if (pendingRequests.length > 0) {
+      pendingRequests.forEach((request) => {
+        rows.push({
+          group: 'Danh sách yêu cầu chờ duyệt',
+          item: getRequestCode(request),
+          value: request.quantity,
+          student: `${request.studentName}${request.studentCode ? ` · ${request.studentCode}` : ''}`,
+          device: request.deviceName,
+          time: formatDateTime(request.createdAt || request.borrowDate),
+          rank: getRankLabel(request.trustScore, request.trustRank),
+          status: getStatusLabel(request.status),
+          note: request.purpose || request.note || 'Chưa cập nhật mục đích'
+        });
+      });
+    } else {
+      rows.push({ group: 'Danh sách yêu cầu chờ duyệt', item: 'Chưa có dữ liệu', value: 'Chưa có dữ liệu' });
+    }
+
+    const exported = exportToExcel<DashboardExportRow>({
+      fileName: 'bao-cao-tong-quan-dashboard',
+      sheetName: 'Tổng quan dashboard',
+      rows,
+      columns: [
+        { header: 'Nhóm', key: 'group', width: 28 },
+        { header: 'Chỉ số / Mã đơn', key: 'item', width: 30 },
+        { header: 'Giá trị / Số lượng', key: 'value', width: 18 },
+        { header: 'Sinh viên', key: 'student', width: 30 },
+        { header: 'Thiết bị', key: 'device', width: 28 },
+        { header: 'Thời gian', key: 'time', width: 18 },
+        { header: 'Hạng sinh viên', key: 'rank', width: 16 },
+        { header: 'Trạng thái', key: 'status', width: 24 },
+        { header: 'Ghi chú', key: 'note', width: 42 }
+      ]
+    });
+
+    if (!exported) message.warning('Chưa có dữ liệu để xuất báo cáo.');
+  };
+
   return (
     <div style={{ paddingBottom: 48, fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif' }}>
       <div
@@ -452,13 +588,9 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Tooltip title="Chức năng xuất báo cáo sẽ khả dụng khi hệ thống hỗ trợ.">
-            <span>
-              <Button disabled icon={<FileExcelOutlined />} title="Chức năng xuất báo cáo sẽ khả dụng khi hệ thống hỗ trợ.">
-                Xuất báo cáo
-              </Button>
-            </span>
-          </Tooltip>
+          <Button icon={<FileExcelOutlined />} loading={reportLoading} onClick={handleExportDashboard}>
+            Xuất báo cáo
+          </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => history.push(ROUTES.adminDevices)} style={{ background: '#2D4A3E', borderColor: '#2D4A3E' }}>
             Thêm thiết bị
           </Button>

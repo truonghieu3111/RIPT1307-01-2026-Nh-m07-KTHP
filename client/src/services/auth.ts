@@ -1,11 +1,12 @@
 import { apiGet, apiPatchForm, apiPost } from './http';
-import type { User } from '@/types';
+import type { User, UserRole } from '@/types';
 
 const API_BASE_URL = process.env.API_BASE_URL || '/api';
 
 export interface LoginPayload {
   email: string;
   password: string;
+  role?: UserRole;
 }
 
 export interface RegisterPayload {
@@ -91,10 +92,72 @@ type RawUser = Partial<User> & {
   data?: RawUser;
 };
 
+interface DemoAccount {
+  email: string;
+  password: string;
+  user: User;
+}
+
 interface MeResponse {
   message?: string;
   data?: RawUser;
 }
+
+// FE-only demo fallback for deployments where the backend/database is not online yet.
+const DEMO_ACCOUNTS: DemoAccount[] = [
+  {
+    email: 'admin@school.edu.vn',
+    password: 'password',
+    user: {
+      id: 'demo-admin',
+      fullName: 'Admin Demo',
+      name: 'Admin Demo',
+      email: 'admin@school.edu.vn',
+      role: 'admin',
+      token: 'demo-token-admin'
+    }
+  },
+  {
+    email: 'phanhaiduc1262006@gmail.com',
+    password: '120606',
+    user: {
+      id: 'demo-student-1',
+      studentId: 'demo-student-1',
+      fullName: 'Phan Hải Đức',
+      name: 'Phan Hải Đức',
+      email: 'phanhaiduc1262006@gmail.com',
+      role: 'student',
+      studentCode: 'DEMO001',
+      className: 'Demo',
+      token: 'demo-token-student',
+      trustScore: 100,
+      trustRank: 'diamond',
+      goodReturnStreak: 0,
+      borrowLocked: false,
+      isPermanentlyLocked: false
+    }
+  },
+  {
+    email: 'pdd150999@gmail.com',
+    password: '654321',
+    user: {
+      id: 'demo-student-2',
+      studentId: 'demo-student-2',
+      fullName: 'Sinh viên Demo',
+      name: 'Sinh viên Demo',
+      email: 'pdd150999@gmail.com',
+      role: 'student',
+      studentCode: 'DEMO002',
+      className: 'Demo',
+      token: 'demo-token-student',
+      trustScore: 88,
+      trustRank: 'gold',
+      goodReturnStreak: 0,
+      borrowLocked: false,
+      isPermanentlyLocked: false
+    }
+  }
+];
 
 function getApiOrigin() {
   if (API_BASE_URL.startsWith('http://') || API_BASE_URL.startsWith('https://')) {
@@ -160,6 +223,29 @@ function normalizeUser(raw: RawUser): User {
 
 export function login(payload: LoginPayload) {
   return apiPost<RawUser>('/auth/login', payload).then(normalizeUser);
+}
+
+function findDemoAccount(payload: LoginPayload) {
+  const email = payload.email.trim().toLowerCase();
+  return DEMO_ACCOUNTS.find((account) => account.email.toLowerCase() === email && account.password === payload.password);
+}
+
+export function isDemoLoginEnabled() {
+  if (process.env.UMI_APP_DEMO_MODE === 'true') return true;
+  if (typeof window === 'undefined') return false;
+
+  return window.location.hostname.includes('vercel.app');
+}
+
+export function isDemoAuthUser(user?: User | null) {
+  return Boolean(user?.token?.startsWith('demo-token-'));
+}
+
+export async function loginWithDemoFallback(payload: LoginPayload) {
+  const demoAccount = isDemoLoginEnabled() ? findDemoAccount(payload) : undefined;
+  if (demoAccount) return { ...demoAccount.user };
+
+  return login(payload);
 }
 
 export function getMe() {

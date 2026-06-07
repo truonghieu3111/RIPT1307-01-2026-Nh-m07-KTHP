@@ -228,6 +228,11 @@ async function approveRequest(requestId, adminId) {
 
 // Từ chối duyệt đơn
 async function rejectRequest(requestId, adminId, reason) {
+  const rejectionReason = String(reason ?? '').trim();
+  if (!rejectionReason) {
+    throw { status: 400, message: 'Vui lòng nhập lý do từ chối.' };
+  }
+
   const request = await BorrowRequest.findOne({ where: { id: requestId, status: 'pending' } });
   
   if (!request) {
@@ -238,7 +243,7 @@ async function rejectRequest(requestId, adminId, reason) {
     status: 'rejected',
     rejectedBy: adminId,
     rejectedAt: new Date(),
-    rejectionReason: reason || 'Không đủ điều kiện mượn'
+    rejectionReason
   });
 
   try {
@@ -250,9 +255,9 @@ async function rejectRequest(requestId, adminId, reason) {
         { 
           name: studentInfo.fullName, 
           request_code: request.requestCode,
-          reason: reason || 'Không đủ điều kiện mượn'
+          reason: rejectionReason
         },
-        request.student.userId,
+        studentInfo.userId,
         request.id
       );
     }

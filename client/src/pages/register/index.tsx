@@ -88,28 +88,10 @@ export default function RegisterPage() {
               minHeight: 'calc(100vh - 56px)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               padding: '72px 64px'
             }}
           >
-            <div
-              style={{
-                width: 74,
-                height: 74,
-                borderRadius: 18,
-                border: '1px solid rgba(245, 235, 208, 0.35)',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#F5EBD0',
-                fontFamily: 'var(--app-heading-font)',
-                fontSize: 34,
-                fontStyle: 'italic',
-                fontWeight: 700
-              }}
-            >
-              B
-            </div>
-
             <div style={{ maxWidth: 560 }}>
               <Typography.Title
                 level={1}
@@ -135,10 +117,6 @@ export default function RegisterPage() {
                 mượn trả lành mạnh.
               </Typography.Paragraph>
             </div>
-
-            <Typography.Text style={{ color: 'rgba(255,255,255,0.42)', fontSize: 18 }}>
-              CLB · BorrowIt v1.0 · 2026
-            </Typography.Text>
           </div>
         </Col>
 
