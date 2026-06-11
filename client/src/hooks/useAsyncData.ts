@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useAsyncData<T>(requestFn: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const requestFnRef = useRef(requestFn);
 
-  const refresh = async () => {
+  useEffect(() => {
+    requestFnRef.current = requestFn;
+  }, [requestFn]);
+
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const result = await requestFn();
+      const result = await requestFnRef.current();
       setData(result);
       return result;
     } catch (requestError) {
@@ -19,16 +23,11 @@ export function useAsyncData<T>(requestFn: () => Promise<T>, deps: unknown[] = [
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void refresh();
   }, deps);
 
-  return {
-    data,
-    loading,
-    error,
-    refresh
-  };
+  return { data, loading, error, refresh };
 }

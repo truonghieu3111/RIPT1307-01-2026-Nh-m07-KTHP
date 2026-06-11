@@ -5,7 +5,6 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileExcelOutlined,
-  PlusOutlined,
   WarningOutlined
 } from '@ant-design/icons';
 import { Button, Card, Col, Empty, Form, Input, message, Modal, Progress, Row, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
@@ -590,9 +589,6 @@ export default function AdminDashboardPage() {
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Button icon={<FileExcelOutlined />} loading={reportLoading} onClick={handleExportDashboard}>
             Xuất báo cáo
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => history.push(ROUTES.adminDevices)} style={{ background: '#2D4A3E', borderColor: '#2D4A3E' }}>
-            Thêm thiết bị
           </Button>
         </div>
       </div>
